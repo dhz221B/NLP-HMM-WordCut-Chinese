@@ -4,14 +4,16 @@ import numpy as np
 import os
 import re
 
-def make_label(text_str):    # 从单词到label的转换, 如: 今天 ----> BE  麻辣肥牛: ---> BMME  的 ---> S
+# 给每个词打状态label，单字词为 S，多字词除了开头是 B，结尾是 E，中间都是 M
+# 如: 今天 ----> BE  麻辣肥牛: ---> BMME  的 ---> S
+def make_label(text_str):
     text_len = len(text_str)
     if text_len == 1:
         return "S"
-    return "B" + "M" * (text_len - 2) + "E"  # 除了开头是 B, 结尾是 E，中间都是Ｍ
+    return "B" + "M" * (text_len - 2) + "E"
 
-
-def text_to_state(file_text, file_state):  # 将原始的语料库转换为 对应的状态文件
+# 将原始的语料库转换为 对应的状态文件
+def text_to_state(file_text, file_state):
     if os.path.exists(file_state):  # 如果存在该文件, 就直接退出
         return
     all_data = open(file_text, "r", encoding="utf-8").read().split("\n")  # 打开文件并按行切分到  all_data 中 , all_data  是一个list
@@ -39,15 +41,15 @@ class HMM:
         self.init_matrix = np.zeros((self.len_states))                                 # 初始矩阵 : 1 * 4 , 对应的是 BMSE
         self.transfer_matrix = np.zeros((self.len_states, self.len_states))            # 转移状态矩阵:  4 * 4 ,
 
-        # 发射矩阵, 使用的 2级 字典嵌套
-        # # 注意这里初始化了一个  total 键 , 存储当前状态出现的总次数, 为了后面的归一化使用
+        # 发射矩阵, 使用的 2 级字典嵌套
+        # 注意这里初始化了一个 total 键, 存储当前状态出现的总次数, 为了后面的归一化使用
         self.emit_matrix = {"B": {"total": 0}, "M": {"total": 0}, "S": {"total": 0}, "E": {"total": 0}}
 
-    # 计算 初始矩阵
+    # 计算初始矩阵：统计每行第一个字的状态
     def cal_init_matrix(self, state):
         self.init_matrix[self.states_to_index[state[0]]] += 1  # BMSE 四种状态, 对应状态出现 1次 就 +1
 
-    # 计算转移矩阵
+    # 计算转移矩阵：统计从当前状态到下一状态的这一变化出现的次数，从而求得状态改变的概率
     def cal_transfer_matrix(self, states):
         sta_join = "".join(states)        # 状态转移, 从当前状态转移到后一状态, 即从 sta1 每一元素转移到 sta2 中
         sta1 = sta_join[:-1]
@@ -59,7 +61,7 @@ class HMM:
     def cal_emit_matrix(self, words, states):
         for word, state in zip("".join(words), "".join(states)):  # 先把 words 和 states 拼接起来再遍历, 因为中间有空格
             self.emit_matrix[state][word] = self.emit_matrix[state].get(word, 0) + 1
-            self.emit_matrix[state]["total"] += 1   # 注意这里多添加了一个  total 键 , 存储当前状态出现的总次数, 为了后面的归一化使用
+            self.emit_matrix[state]["total"] += 1   # 注意这里多添加了一个 total 键 , 存储当前状态出现的总次数, 为了后面的归一化使用
 
     # 将矩阵归一化
     def normalize(self):
@@ -93,7 +95,7 @@ class HMM:
             for d_index, data in tqdm(enumerate(all_data)):
                 if data:
                     res = viterbi_t(data, self)
-                    # print(res)
+                    print(res)
                     f.write(res + "\n")
 
 
@@ -122,7 +124,7 @@ def viterbi_t( text, hmm):
             temp = []
             for y0 in states:
                 if V[t - 1][y0] > 0:
-                    temp.append((V[t - 1][y0] * trans_p[hmm.states_to_index[y0],hmm.states_to_index[y]] * emitP, y0))
+                    temp.append((V[t - 1][y0] * trans_p[hmm.states_to_index[y0], hmm.states_to_index[y]] * emitP, y0))
             (prob, state) = max(temp)
             # (prob, state) = max([(V[t - 1][y0] * trans_p[hmm.states_to_index[y0],hmm.states_to_index[y]] * emitP, y0)  for y0 in states if V[t - 1][y0] > 0])
             V[t][y] = prob
@@ -141,14 +143,12 @@ def viterbi_t( text, hmm):
 
 
 if __name__ == "__main__":
-    text_to_state("msr_training.txt", "msr_training_state.txt")
-    # text_to_state("msr_test.txt", "msr_test_state.txt")
-    
+    text_to_state("./seg-data/training/msr_training.utf8", "./seg-data/training/msr_training_state.utf8")
     # text = '｀得心应手＇大概就是这个意思吧。”'
 
-    hmm = HMM("msr_training.txt", "msr_training_state.txt")
+    hmm = HMM("./seg-data/training/msr_training.utf8", "./seg-data/training/msr_training_state.utf8")
     hmm.train()
-    hmm.test("msr_test.txt", "msr_test_result.txt")
+    hmm.test("./seg-data/testing/msr_test.utf8", "./seg-data/testing/msr_test_result.utf8")
 
     # result = viterbi_t(text,hmm)
 
